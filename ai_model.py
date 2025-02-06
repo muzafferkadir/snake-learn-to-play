@@ -15,6 +15,8 @@ class DQN(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_size, hidden_size),
             nn.ReLU(),
+            nn.Linear(hidden_size, hidden_size),
+            nn.ReLU(),
             nn.Linear(hidden_size, output_size)
         )
 
@@ -22,15 +24,15 @@ class DQN(nn.Module):
         return self.network(x)
 
 class SnakeAI:
-    def __init__(self, state_size=21, hidden_size=256, action_size=3):
+    def __init__(self, state_size=25, hidden_size=256, action_size=3):
         self.state_size = state_size
         self.action_size = action_size
         self.memory = deque(maxlen=100000)
         self.gamma = 0.98
         self.epsilon = 1.0  # Başlangıç epsilon değeri
         self.epsilon_min = 0.02  # Minimum epsilon değeri (0.05'ten 0.02'ye)
-        self.epsilon_decay = 0.998  # Orta seviye azalma (0.999'dan 0.998'e)
-        self.learning_rate = 0.0005
+        self.epsilon_decay = 0.995  # Orta seviye azalma (0.999'dan 0.998'e)
+        self.learning_rate = 0.0003
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         self.model = DQN(state_size, hidden_size, action_size).to(self.device)
@@ -52,6 +54,12 @@ class SnakeAI:
         dir_r = game.direction == Direction.RIGHT
         dir_u = game.direction == Direction.UP
         dir_d = game.direction == Direction.DOWN
+
+        # Ek olarak, yılanın iki adım ileriye bakmasını sağlayın
+        point_ll = (head[0] - 2, head[1])
+        point_rr = (head[0] + 2, head[1])
+        point_uu = (head[0], head[1] - 2)
+        point_dd = (head[0], head[1] + 2)
 
         # State vektörü (toplam 21 özellik):
         state = [
@@ -101,9 +109,15 @@ class SnakeAI:
             int(point_u in game.snake[1:]),  # Yukarı
             int(point_d in game.snake[1:]),  # Aşağı
 
-            # Kuyruk yönü (1 özellik)
+            # Kuyruk yönü (2 özellik)
             int(game.snake[-1][0] < head[0]) - int(game.snake[-1][0] > head[0]),  # X ekseni kuyruk yönü
-            int(game.snake[-1][1] < head[1]) - int(game.snake[-1][1] > head[1])   # Y ekseni kuyruk yönü
+            int(game.snake[-1][1] < head[1]) - int(game.snake[-1][1] > head[1]),   # Y ekseni kuyruk yönü
+
+            # Yeni Eklenen: İki adım ileri tehlikeler
+            int(self.is_collision(game, point_ll)),
+            int(self.is_collision(game, point_rr)),
+            int(self.is_collision(game, point_uu)),
+            int(self.is_collision(game, point_dd)),
         ]
 
         return np.array(state, dtype=np.float32)

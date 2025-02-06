@@ -37,7 +37,7 @@ class TrainLogger:
 
 def train():
     n_games = 1000
-    batch_size = 32
+    batch_size = 64  # 64 olarak kalsın
     record = 0
     ai = SnakeAI()
     game = SnakeGame()
@@ -108,8 +108,8 @@ def train():
             
             steps += 1
             
-            # Her 100 adımda bir target modeli güncelle
-            if steps % 100 == 0:
+            # Her 500 adımda bir target modeli güncelle
+            if steps % 500 == 0:
                 ai.update_target_model()
             
             if show_ui:
@@ -213,7 +213,9 @@ def play_step(game, action):
     
     # Elma yeme ödülü
     if game.score > old_score:
-        reward = 20  # Elma yeme ödülü
+        reward = 25  # Elma yeme ödülü
+    else:
+        reward = -0.05  # Normal adım cezası
     
     return reward, game.game_over, game.score, death_cause
 
