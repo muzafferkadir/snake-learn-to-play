@@ -1,0 +1,19 @@
+# Oyun sabitleri
+CELL_SIZE = 20
+GRID_SIZE = 32
+HEADER_HEIGHT = 60
+SCREEN_WIDTH = CELL_SIZE * GRID_SIZE
+SCREEN_HEIGHT = CELL_SIZE * GRID_SIZE + HEADER_HEIGHT
+INITIAL_SPEED = 5  # Başlangıç hızı
+SPEED_INCREASE = 1  # Hız artış miktarı
+MAX_SPEED = 15  # Maksimum hız sınırı
+
+# Renkler
+BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
+GREEN = (50, 205, 50)
+RED = (255, 0, 0)
+GRID_COLOR = (40, 40, 40)
+BUTTON_COLOR = (70, 130, 180)  # Steel Blue
+BUTTON_HOVER_COLOR = (100, 149, 237)  # Cornflower Blue
+HEADER_COLOR = (25, 25, 25)  # Koyu gri 
