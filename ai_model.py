@@ -22,7 +22,7 @@ class DQN(nn.Module):
         return self.network(x)
 
 class SnakeAI:
-    def __init__(self, state_size=12, hidden_size=256, action_size=3):
+    def __init__(self, state_size=17, hidden_size=256, action_size=3):
         self.state_size = state_size
         self.action_size = action_size
         self.memory = deque(maxlen=100000)
@@ -53,7 +53,7 @@ class SnakeAI:
         dir_u = game.direction == Direction.UP
         dir_d = game.direction == Direction.DOWN
 
-        # State vektörü (toplam 12 özellik):
+        # State vektörü (toplam 17 özellik):
         state = [
             # Tehlike düz (1 özellik)
             (dir_r and self.is_collision(game, point_r)) or 
@@ -86,7 +86,16 @@ class SnakeAI:
             int(game.apple[1] > head[1]),  # elma aşağı
 
             # Yılanın mevcut yönü (1 özellik)
-            int(game.direction.value) / 4.0  # Normalize edilmiş yön değeri
+            int(game.direction.value) / 4.0,  # Normalize edilmiş yön değeri
+
+            # Yılan vücut bilgileri (5 özellik)
+            len(game.snake) / GRID_SIZE,  # Normalize edilmiş yılan uzunluğu
+            
+            # Vücut parçaları var mı? (4 yön)
+            int(point_l in game.snake[1:]),  # Sol
+            int(point_r in game.snake[1:]),  # Sağ
+            int(point_u in game.snake[1:]),  # Yukarı
+            int(point_d in game.snake[1:])   # Aşağı
         ]
 
         return np.array(state, dtype=np.float32)
