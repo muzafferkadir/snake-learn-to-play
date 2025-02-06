@@ -53,6 +53,7 @@ class Button:
 class SnakeGame:
     def __init__(self):
         pygame.init()
+        self.show_ui = True  # UI gösterme kontrolü
         # Eğitim paneli için sağda ekstra alan
         self.info_panel_width = 300
         self.screen = pygame.display.set_mode((SCREEN_WIDTH + self.info_panel_width, SCREEN_HEIGHT))
@@ -73,7 +74,7 @@ class SnakeGame:
         
         # Hız kontrol butonları
         self.speed_buttons = []
-        self.speeds = [1, 2, 4, 16, 64]  # Hız çarpanları güncellendi
+        self.speeds = [1, 8, 16, 128, 512]
         button_width = 45
         button_height = 25
         spacing = 8
@@ -89,6 +90,19 @@ class SnakeGame:
         
         self.reset_game()
 
+    def enable_ui(self):
+        """UI'ı etkinleştir"""
+        self.show_ui = True
+        if not pygame.display.get_init():
+            pygame.init()
+            self.screen = pygame.display.set_mode((SCREEN_WIDTH + self.info_panel_width, SCREEN_HEIGHT))
+
+    def disable_ui(self):
+        """UI'ı devre dışı bırak"""
+        self.show_ui = False
+        if pygame.display.get_init():
+            pygame.display.quit()
+
     def reset_game(self):
         self.direction = Direction.RIGHT
         self.snake = [(GRID_SIZE//2, GRID_SIZE//2), (GRID_SIZE//2 - 1, GRID_SIZE//2)]
@@ -97,6 +111,7 @@ class SnakeGame:
         if not self.is_training:
             self.speed = self.base_speed
         self.game_over = False
+        self.death_cause = None  # Ölüm nedenini sıfırla
 
     def place_apple(self):
         while True:
@@ -150,7 +165,7 @@ class SnakeGame:
 
     def move_snake(self):
         if self.game_over:
-            return
+            return None
 
         head = self.snake[0]
         if self.direction == Direction.UP:
@@ -166,27 +181,35 @@ class SnakeGame:
         if (new_head[0] < 0 or new_head[0] >= GRID_SIZE or
             new_head[1] < 0 or new_head[1] >= GRID_SIZE):
             self.game_over = True
-            return
+            self.death_cause = "DUVAR"
+            return self.death_cause
 
         # Kendine çarpma kontrolü
         if new_head in self.snake:
             self.game_over = True
-            return
+            self.death_cause = "KUYRUK"
+            return self.death_cause
 
         self.snake.insert(0, new_head)
 
         # Elma yeme kontrolü
         if new_head == self.apple:
             self.score += 1
-            if self.score % 5 == 0:  # Her 5 elmada bir hız artışı
-                # Maksimum hız kontrolü
-                if self.speed < MAX_SPEED:
-                    self.speed += SPEED_INCREASE
+            if not self.is_training:  # Eğitim modunda değilse hız artışı
+                if self.score % 5 == 0:  # Her 5 elmada bir hız artışı
+                    # Maksimum hız kontrolü
+                    if self.speed < MAX_SPEED:
+                        self.speed += SPEED_INCREASE
             self.place_apple()
         else:
             self.snake.pop()
 
+        return None
+
     def draw(self):
+        if not self.show_ui:
+            return
+            
         self.screen.fill(BLACK)
         
         # Header çizimi
@@ -237,6 +260,9 @@ class SnakeGame:
             self.replay_button.draw(self.screen)
 
     def draw_training_info(self, game, score, record, mean_score, epsilon, steps, fps):
+        if not self.show_ui:
+            return
+            
         # Sağ panel arkaplanı
         panel_x = SCREEN_WIDTH
         pygame.draw.rect(self.screen, HEADER_COLOR, 

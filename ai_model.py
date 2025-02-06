@@ -22,15 +22,15 @@ class DQN(nn.Module):
         return self.network(x)
 
 class SnakeAI:
-    def __init__(self, state_size=17, hidden_size=256, action_size=3):
+    def __init__(self, state_size=21, hidden_size=256, action_size=3):
         self.state_size = state_size
         self.action_size = action_size
         self.memory = deque(maxlen=100000)
-        self.gamma = 0.95  # İndirim faktörü
-        self.epsilon = 1.0  # Keşif oranı
-        self.epsilon_min = 0.01
-        self.epsilon_decay = 0.995
-        self.learning_rate = 0.001
+        self.gamma = 0.98
+        self.epsilon = 1.0  # Başlangıç epsilon değeri
+        self.epsilon_min = 0.02  # Minimum epsilon değeri (0.05'ten 0.02'ye)
+        self.epsilon_decay = 0.998  # Orta seviye azalma (0.999'dan 0.998'e)
+        self.learning_rate = 0.0005
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         self.model = DQN(state_size, hidden_size, action_size).to(self.device)
@@ -53,25 +53,25 @@ class SnakeAI:
         dir_u = game.direction == Direction.UP
         dir_d = game.direction == Direction.DOWN
 
-        # State vektörü (toplam 17 özellik):
+        # State vektörü (toplam 21 özellik):
         state = [
             # Tehlike düz (1 özellik)
-            (dir_r and self.is_collision(game, point_r)) or 
-            (dir_l and self.is_collision(game, point_l)) or 
-            (dir_u and self.is_collision(game, point_u)) or 
-            (dir_d and self.is_collision(game, point_d)),
+            int((dir_r and self.is_collision(game, point_r)) or 
+                (dir_l and self.is_collision(game, point_l)) or 
+                (dir_u and self.is_collision(game, point_u)) or 
+                (dir_d and self.is_collision(game, point_d))),
 
             # Tehlike sağ (1 özellik)
-            (dir_u and self.is_collision(game, point_r)) or 
-            (dir_d and self.is_collision(game, point_l)) or 
-            (dir_l and self.is_collision(game, point_u)) or 
-            (dir_r and self.is_collision(game, point_d)),
+            int((dir_u and self.is_collision(game, point_r)) or 
+                (dir_d and self.is_collision(game, point_l)) or 
+                (dir_l and self.is_collision(game, point_u)) or 
+                (dir_r and self.is_collision(game, point_d))),
 
             # Tehlike sol (1 özellik)
-            (dir_d and self.is_collision(game, point_r)) or 
-            (dir_u and self.is_collision(game, point_l)) or 
-            (dir_r and self.is_collision(game, point_u)) or 
-            (dir_l and self.is_collision(game, point_d)),
+            int((dir_d and self.is_collision(game, point_r)) or 
+                (dir_u and self.is_collision(game, point_l)) or 
+                (dir_r and self.is_collision(game, point_u)) or 
+                (dir_l and self.is_collision(game, point_d))),
 
             # Hareket yönü (4 özellik)
             int(dir_l),
@@ -85,17 +85,25 @@ class SnakeAI:
             int(game.apple[1] < head[1]),  # elma yukarı
             int(game.apple[1] > head[1]),  # elma aşağı
 
+            # Elma mesafesi (2 özellik)
+            abs(game.apple[0] - head[0]) / GRID_SIZE,  # x mesafesi
+            abs(game.apple[1] - head[1]) / GRID_SIZE,  # y mesafesi
+
             # Yılanın mevcut yönü (1 özellik)
             int(game.direction.value) / 4.0,  # Normalize edilmiş yön değeri
 
-            # Yılan vücut bilgileri (5 özellik)
+            # Yılan vücut bilgileri (6 özellik)
             len(game.snake) / GRID_SIZE,  # Normalize edilmiş yılan uzunluğu
             
             # Vücut parçaları var mı? (4 yön)
             int(point_l in game.snake[1:]),  # Sol
             int(point_r in game.snake[1:]),  # Sağ
             int(point_u in game.snake[1:]),  # Yukarı
-            int(point_d in game.snake[1:])   # Aşağı
+            int(point_d in game.snake[1:]),  # Aşağı
+
+            # Kuyruk yönü (1 özellik)
+            int(game.snake[-1][0] < head[0]) - int(game.snake[-1][0] > head[0]),  # X ekseni kuyruk yönü
+            int(game.snake[-1][1] < head[1]) - int(game.snake[-1][1] > head[1])   # Y ekseni kuyruk yönü
         ]
 
         return np.array(state, dtype=np.float32)
@@ -165,4 +173,11 @@ class SnakeAI:
         self.model.load_state_dict(torch.load(name))
 
     def save(self, name):
-        torch.save(self.model.state_dict(), name) 
+        torch.save(self.model.state_dict(), name)
+
+    def check_epsilon_reset(self):
+        """Belirli sayıda oyun sonrası epsilon değerini yeniden ayarlar"""
+        self.current_game += 1
+        if self.current_game % self.games_before_reset == 0:
+            self.epsilon = max(self.epsilon_reset_value, self.epsilon)
+            print(f"\nEpsilon reset edildi: {self.epsilon:.3f}") 
