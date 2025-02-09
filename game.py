@@ -1,87 +1,155 @@
-import pygame
-import random
-import numpy as np
-from direction import Direction
-from constants import *
+# Gerekli kütüphanelerin import edilmesi
+import pygame  # Oyun arayüzü için
+import random  # Rastgele sayı üretimi için
+import numpy as np  # Numerik işlemler için
+from direction import Direction  # Yön enumları
+from constants import *  # Oyun sabitleri
 
-# Renkler
-BLACK = (0, 0, 0)
-WHITE = (255, 255, 255)
-GREEN = (50, 205, 50)
-RED = (255, 0, 0)
-GRID_COLOR = (40, 40, 40)
-BUTTON_COLOR = (70, 130, 180)  # Steel Blue
-BUTTON_HOVER_COLOR = (100, 149, 237)  # Cornflower Blue
-HEADER_COLOR = (25, 25, 25)  # Koyu gri
+# Oyunda kullanılacak renkler (RGB formatında)
+BLACK = (0, 0, 0)  # Arka plan rengi
+WHITE = (255, 255, 255)  # Yazı ve çerçeve rengi
+GREEN = (50, 205, 50)  # Yılan rengi
+RED = (255, 0, 0)  # Elma rengi
+GRID_COLOR = (40, 40, 40)  # Izgara çizgileri rengi
+BUTTON_COLOR = (70, 130, 180)  # Buton normal rengi (Steel Blue)
+BUTTON_HOVER_COLOR = (100, 149, 237)  # Buton hover rengi (Cornflower Blue)
+HEADER_COLOR = (25, 25, 25)  # Başlık arkaplan rengi (Koyu gri)
 
-# Oyun sabitleri
-CELL_SIZE = 20
-GRID_SIZE = 32
-HEADER_HEIGHT = 60
-SCREEN_WIDTH = CELL_SIZE * GRID_SIZE
-SCREEN_HEIGHT = CELL_SIZE * GRID_SIZE + HEADER_HEIGHT
-INITIAL_SPEED = 5  # Başlangıç hızı
-SPEED_INCREASE = 1  # Hız artış miktarı
-MAX_SPEED = 15  # Maksimum hız sınırı
+# Oyun parametreleri ve sabitleri
+CELL_SIZE = 20  # Her hücrenin boyutu (piksel)
+GRID_SIZE = 32  # Izgara boyutu (32x32)
+HEADER_HEIGHT = 60  # Üst bilgi çubuğu yüksekliği
+SCREEN_WIDTH = CELL_SIZE * GRID_SIZE  # Ekran genişliği
+SCREEN_HEIGHT = CELL_SIZE * GRID_SIZE + HEADER_HEIGHT  # Ekran yüksekliği
+INITIAL_SPEED = 5  # Başlangıç oyun hızı
+SPEED_INCREASE = 1  # Her artışta eklenecek hız miktarı
+MAX_SPEED = 15  # Maksimum oyun hızı
 
 class Button:
+    """Oyun arayüzünde kullanılan butonların sınıfı
+    
+    Bu sınıf, oyundaki tüm butonların (hız kontrolü, tekrar oyna vb.)
+    görünümünü ve davranışını yönetir.
+    """
     def __init__(self, x, y, width, height, text):
-        self.rect = pygame.Rect(x, y, width, height)
-        self.text = text
-        self.is_hovered = False
-        self.font = pygame.font.Font(None, 24)  # Buton font boyutunu küçülttük
+        """Buton nesnesinin başlatılması
+        
+        Args:
+            x (int): Butonun x koordinatı
+            y (int): Butonun y koordinatı
+            width (int): Buton genişliği
+            height (int): Buton yüksekliği
+            text (str): Buton üzerindeki yazı
+        """
+        self.rect = pygame.Rect(x, y, width, height)  # Butonun dikdörtgen alanı
+        self.text = text  # Buton yazısı
+        self.is_hovered = False  # Fare üzerinde mi?
+        self.font = pygame.font.Font(None, 24)  # Yazı tipi ve boyutu
 
     def draw(self, screen):
-        color = BUTTON_HOVER_COLOR if self.is_hovered else BUTTON_COLOR
-        pygame.draw.rect(screen, color, self.rect)
-        pygame.draw.rect(screen, WHITE, self.rect, 2)  # Border
+        """Butonu ekrana çizer
         
+        Args:
+            screen: Pygame ekran nesnesi
+        """
+        # Buton rengini belirle (fare üzerindeyse farklı renk)
+        color = BUTTON_HOVER_COLOR if self.is_hovered else BUTTON_COLOR
+        
+        # Butonu çiz
+        pygame.draw.rect(screen, color, self.rect)  # Buton arkaplanı
+        pygame.draw.rect(screen, WHITE, self.rect, 2)  # Buton çerçevesi
+        
+        # Buton yazısını çiz
         text_surface = self.font.render(self.text, True, WHITE)
         text_rect = text_surface.get_rect(center=self.rect.center)
         screen.blit(text_surface, text_rect)
 
     def handle_event(self, event):
+        """Buton olaylarını işler (fare hareketi ve tıklama)
+        
+        Args:
+            event: Pygame olay nesnesi
+            
+        Returns:
+            bool: Tıklandıysa True, değilse False
+        """
+        # Fare hareketi kontrolü
         if event.type == pygame.MOUSEMOTION:
             mouse_pos = pygame.mouse.get_pos()
             self.is_hovered = self.rect.collidepoint(mouse_pos)
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:  # Sol tık
+        # Fare tıklaması kontrolü (sadece sol tık)
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             mouse_pos = pygame.mouse.get_pos()
             if self.rect.collidepoint(mouse_pos):
                 return True
         return False
 
 class SnakeGame:
+    """Yılan oyununun ana sınıfı
+    
+    Bu sınıf, oyunun tüm mekaniğini yönetir:
+    - Oyun döngüsü
+    - Grafik arayüzü
+    - Yılanın hareketi ve kontrolleri
+    - Çarpışma tespiti
+    - Skor takibi
+    - Eğitim modu özellikleri
+    """
     def __init__(self):
-        pygame.init()
-        self.show_ui = True  # UI gösterme kontrolü
-        self.is_training = False  # Eğitim modu kontrolü
-        # Eğitim paneli için sağda ekstra alan
-        self.info_panel_width = 300
-        self.screen = pygame.display.set_mode((SCREEN_WIDTH + (self.info_panel_width if self.is_training else 0), SCREEN_HEIGHT))
-        pygame.display.set_caption('Snake Game with AI')
-        self.clock = pygame.time.Clock()
-        self.base_speed = INITIAL_SPEED  # Temel hız
-        self.speed = INITIAL_SPEED  # Oyun hızı
-        self.training_speed = INITIAL_SPEED  # Eğitim hızı
-        self.speed_multiplier = 1
-        self.last_direction = Direction.RIGHT  # Son yön bilgisini tutmak için
+        """Oyun nesnesinin başlatılması
         
-        # Tekrar oyna butonu
+        Bu fonksiyon:
+        1. Pygame'i başlatır
+        2. Ekranı ayarlar
+        3. Oyun parametrelerini tanımlar
+        4. Butonları oluşturur
+        5. Oyunu sıfırlar
+        """
+        # Pygame'i başlat ve temel ayarları yap
+        pygame.init()
+        self.show_ui = True  # Arayüz gösterme durumu
+        self.is_training = False  # Eğitim modu durumu
+        
+        # Ekran boyutlarını ayarla
+        self.info_panel_width = 300  # Eğitim paneli genişliği
+        total_width = SCREEN_WIDTH + (self.info_panel_width if self.is_training else 0)
+        self.screen = pygame.display.set_mode((total_width, SCREEN_HEIGHT))
+        pygame.display.set_caption('Snake Game with AI')
+        
+        # Oyun zamanlayıcısı ve hız ayarları
+        self.clock = pygame.time.Clock()
+        self.base_speed = INITIAL_SPEED  # Temel oyun hızı
+        self.speed = INITIAL_SPEED  # Güncel oyun hızı
+        self.training_speed = INITIAL_SPEED  # Eğitim modu hızı
+        self.speed_multiplier = 1  # Hız çarpanı
+        
+        # Yılanın yön bilgisi
+        self.last_direction = Direction.RIGHT  # Başlangıç yönü
+        
+        # Arayüz butonlarını oluştur
+        # 1. Tekrar oyna butonu
         button_width = 200
         button_height = 50
         button_x = (SCREEN_WIDTH - button_width) // 2
         button_y = (SCREEN_HEIGHT - button_height) // 2 + 50
-        self.replay_button = Button(button_x, button_y, button_width, button_height, "Tekrar Oyna")
+        self.replay_button = Button(
+            button_x, button_y, 
+            button_width, button_height, 
+            "Tekrar Oyna"
+        )
         
-        # Hız kontrol butonları
+        # 2. Hız kontrol butonları
         self.speed_buttons = []
-        self.speeds = [1, 8, 16, 128, 512]
+        self.speeds = [1, 8, 16, 128, 512]  # Hız seçenekleri
         button_width = 45
         button_height = 25
-        spacing = 8
+        spacing = 8  # Butonlar arası boşluk
+        
+        # Butonların toplam genişliğini hesapla
         total_width = len(self.speeds) * (button_width + spacing) - spacing
         start_x = SCREEN_WIDTH + (self.info_panel_width - total_width) // 2
         
+        # Hız butonlarını oluştur
         for i, speed in enumerate(self.speeds):
             x = start_x + i * (button_width + spacing)
             y = SCREEN_HEIGHT - 50
@@ -89,47 +157,112 @@ class SnakeGame:
                 Button(x, y, button_width, button_height, f"{speed}x")
             )
         
+        # Oyunu başlangıç durumuna getir
         self.reset_game()
 
     def enable_ui(self):
-        """UI'ı etkinleştir"""
-        self.show_ui = True
+        """Oyun arayüzünü etkinleştirir
+        
+        Bu fonksiyon:
+        1. Arayüz gösterme bayrağını aktif eder
+        2. Eğer Pygame başlatılmamışsa başlatır
+        3. Ekranı yeniden ayarlar
+        """
+        self.show_ui = True  # Arayüzü aktif et
+        
+        # Pygame başlatılmamışsa başlat
         if not pygame.display.get_init():
             pygame.init()
-            self.screen = pygame.display.set_mode((SCREEN_WIDTH + self.info_panel_width, SCREEN_HEIGHT))
+            # Eğitim paneli ile birlikte ekranı oluştur
+            self.screen = pygame.display.set_mode(
+                (SCREEN_WIDTH + self.info_panel_width, SCREEN_HEIGHT)
+            )
 
     def disable_ui(self):
-        """UI'ı devre dışı bırak"""
-        self.show_ui = False
+        """Oyun arayüzünü devre dışı bırakır
+        
+        Bu fonksiyon:
+        1. Arayüz gösterme bayrağını devre dışı bırakır
+        2. Eğer Pygame çalışıyorsa kapatır
+        
+        Not: Eğitim sırasında performansı artırmak için kullanılır
+        """
+        self.show_ui = False  # Arayüzü devre dışı bırak
+        
+        # Pygame çalışıyorsa kapat
         if pygame.display.get_init():
             pygame.display.quit()
 
     def reset_game(self):
+        """Oyunu başlangıç durumuna getirir
+        
+        Bu fonksiyon:
+        1. Yılanı başlangıç konumuna yerleştirir
+        2. Yeni bir elma yerleştirir
+        3. Skoru sıfırlar
+        4. Hızı ayarlar
+        5. Oyun durumunu sıfırlar
+        """
+        # Yılanın başlangıç yönü ve konumu
         self.direction = Direction.RIGHT
-        self.snake = [(GRID_SIZE//2, GRID_SIZE//2), (GRID_SIZE//2 - 1, GRID_SIZE//2)]
+        self.snake = [
+            (GRID_SIZE//2, GRID_SIZE//2),      # Baş
+            (GRID_SIZE//2 - 1, GRID_SIZE//2)   # Gövde
+        ]
+        
+        # Yeni elma yerleştir ve skoru sıfırla
         self.place_apple()
         self.score = 0
+        
+        # Eğitim modunda değilse hızı sıfırla
         if not self.is_training:
             self.speed = self.base_speed
+            
+        # Oyun durumunu sıfırla
         self.game_over = False
         self.death_cause = None  # Ölüm nedenini sıfırla
 
     def place_apple(self):
+        """Oyun alanına rastgele bir konumda elma yerleştirir
+        
+        Not: Elma yılanın üzerine gelmeyecek şekilde yerleştirilir
+        """
         while True:
-            self.apple = (random.randint(0, GRID_SIZE-1), random.randint(0, GRID_SIZE-1))
+            # Rastgele bir konum seç
+            self.apple = (
+                random.randint(0, GRID_SIZE-1),  # x koordinatı
+                random.randint(0, GRID_SIZE-1)   # y koordinatı
+            )
+            # Eğer elma yılanın üzerinde değilse döngüyü bitir
             if self.apple not in self.snake:
                 break
 
     def set_training_mode(self, is_training):
-        self.is_training = is_training
+        """Eğitim modunu ayarlar
+        
+        Eğitim modunda:
+        1. Hız çarpanına göre hız ayarlanır
+        2. Sağ panelde eğitim bilgileri gösterilir
+        
+        Args:
+            is_training (bool): Eğitim modu aktif/pasif
+        """
+        self.is_training = is_training  # Eğitim modunu ayarla
+        
         if is_training:
+            # Eğitim hızını ayarla
             self.training_speed = self.base_speed * self.speed_multiplier
-            # Training modunda sağ panel ekle
-            self.screen = pygame.display.set_mode((SCREEN_WIDTH + self.info_panel_width, SCREEN_HEIGHT))
+            # Eğitim panelini ekle
+            self.screen = pygame.display.set_mode(
+                (SCREEN_WIDTH + self.info_panel_width, SCREEN_HEIGHT)
+            )
         else:
+            # Normal moda geç
             self.speed = self.base_speed
-            # Normal modda sağ panel olmadan
-            self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+            # Eğitim panelini kaldır
+            self.screen = pygame.display.set_mode(
+                (SCREEN_WIDTH, SCREEN_HEIGHT)
+            )
 
     def update_speed(self, multiplier):
         old_multiplier = self.speed_multiplier

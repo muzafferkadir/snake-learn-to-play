@@ -1,16 +1,20 @@
 # Snake Game with AI
 
-Bu proje, klasik yılan oyununun Python ile gerçekleştirilmiş bir versiyonudur. Proje iki aşamadan oluşmaktadır:
-1. Klasik yılan oyunu
-2. Makine öğrenmesi ile kendini geliştiren AI kontrolü (gelecek aşama)
+Bu proje, klasik yılan oyununun Python ile gerçekleştirilmiş ve yapay zeka ile geliştirilmiş bir versiyonudur. Proje iki ana bileşenden oluşur:
 
-## Özellikler
-- 32x32 oyun alanı
-- Izgara görünümlü arka plan
-- Yeşil yılan
-- Kırmızı elma
-- Her 5 elmada bir artan hız
-- Çarpışma kontrolü (duvarlar ve yılanın kendisi)
+1. **Klasik Yılan Oyunu**
+   - 32x32 oyun alanı
+   - Izgara görünümlü arka plan
+   - Yeşil yılan ve kırmızı elma
+   - Her 5 elmada bir artan hız
+   - Çarpışma kontrolü (duvarlar ve yılanın kendisi)
+
+2. **Yapay Zeka Kontrolü**
+   - Deep Q-Learning algoritması
+   - Deneyim tekrarı (Experience Replay)
+   - Epsilon-greedy keşif stratejisi
+   - Eğitim istatistikleri görüntüleme
+   - Ayarlanabilir eğitim hızı (1x - 512x)
 
 ## Kurulum
 
@@ -39,28 +43,70 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-5. Oyunu başlatın:
+## Kullanım
+
+### Manuel Oyun
+Klasik yılan oyununu oynamak için:
 ```bash
 python game.py
 ```
 
-6. Oyunu kapattıktan sonra virtual environment'dan çıkmak için:
+**Kontroller:**
+- Yön tuşları: Yılanı kontrol etme
+- ESC: Oyundan çıkış
+
+### AI Eğitimi
+Yapay zekayı eğitmek için:
 ```bash
-deactivate
+python train.py
 ```
 
-## Kontroller
-- Yön tuşları ile yılanı kontrol edebilirsiniz
-- ESC tuşu ile oyundan çıkabilirsiniz
+**Eğitim Parametreleri:**
+- `n_games`: Eğitilecek oyun sayısı (varsayılan: 1000)
+- `batch_size`: Her adımda eğitilecek örnek sayısı (varsayılan: 32)
+
+**Eğitim Ekranı:**
+- Sol tarafta oyun alanı
+- Sağ tarafta eğitim istatistikleri:
+  - Mevcut skor
+  - Rekor skor
+  - Ortalama skor
+  - Epsilon değeri
+  - Adım sayısı
+  - FPS
+
+**Hız Kontrolü:**
+- Eğitim hızını ayarlamak için sağ alt köşedeki butonları kullanın:
+  - 1x: Normal hız
+  - 8x: 8 kat hızlı
+  - 16x: 16 kat hızlı
+  - 128x: 128 kat hızlı
+  - 512x: 512 kat hızlı
+
+## Proje Yapısı
+
+```
+.
+├── game.py           # Oyun motoru ve arayüzü
+├── ai_model.py       # Yapay zeka modeli (DQN)
+├── train.py          # Eğitim döngüsü
+├── direction.py      # Yön enumları
+├── constants.py      # Sabitler
+├── requirements.txt  # Bağımlılıklar
+└── README.md         # Dokümantasyon
+```
 
 ## Geliştirme
 
-Virtual environment'ı aktif ettikten sonra yeni paketler eklemek için:
+Yeni paketler eklemek için:
 ```bash
 pip install paket_adi
 pip freeze > requirements.txt
 ```
 
-## Not
-- `.gitignore` dosyası sayesinde `venv` klasörü git versiyon kontrolüne dahil edilmeyecektir.
-- Her yeni geliştirme ortamında yukarıdaki kurulum adımlarını tekrarlamanız gerekecektir. 
+## Notlar
+
+- `.gitignore` dosyası sayesinde `venv` klasörü ve `__pycache__` git'e dahil edilmez
+- Her yeni geliştirme ortamında kurulum adımlarını tekrarlayın
+- Eğitim sırasında model ağırlıkları otomatik olarak kaydedilir
+- Daha iyi sonuçlar için eğitimi daha uzun süre çalıştırın (n_games > 1000)

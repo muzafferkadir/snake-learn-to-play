@@ -1,49 +1,88 @@
-import pygame
-import numpy as np
-from game import SnakeGame
-from ai_model import SnakeAI
-from direction import Direction
-from constants import INITIAL_SPEED, GRID_SIZE
-import os
-import time
-from collections import deque
+# Gerekli kütüphanelerin import edilmesi
+import pygame  # Oyun arayüzü için
+import numpy as np  # Numerik işlemler için
+from game import SnakeGame  # Yılan oyunu sınıfı
+from ai_model import SnakeAI  # Yapay zeka modeli
+from direction import Direction  # Yön enumları
+from constants import INITIAL_SPEED, GRID_SIZE  # Oyun sabitleri
+import os  # Dosya işlemleri için
+import time  # Zaman ölçümleri için
+from collections import deque  # Sabit boyutlu kuyruk yapısı için
 
 class TrainLogger:
+    """Eğitim sürecini izlemek ve kayıt tutmak için kullanılan sınıf
+    
+    Bu sınıf, eğitim sürecinde elde edilen skor, epsilon, kayıp gibi 
+    değerleri ve çeşitli istatistikleri tutar ve günceller.
+    """
     def __init__(self, log_size=100):
-        self.scores = deque(maxlen=log_size)
-        self.mean_scores = []
-        self.max_score = 0
-        self.total_games = 0
-        self.epsilon_history = []
-        self.loss_history = []
-        # Yeni istatistikler
-        self.wall_deaths = 0
-        self.self_deaths = 0
-        self.total_apples = 0
-        self.longest_snake = 0
+        """TrainLogger sınıfının başlatılması
+        
+        Args:
+            log_size (int): Skor geçmişi için maksimum kayıt sayısı (default: 100)
+        """
+        # Temel metrikler
+        self.scores = deque(maxlen=log_size)  # Son N oyunun skorları
+        self.mean_scores = []  # Ortalama skorların geçmişi
+        self.max_score = 0  # En yüksek skor
+        self.total_games = 0  # Toplam oyun sayısı
+        self.epsilon_history = []  # Epsilon değerlerinin geçmişi
+        self.loss_history = []  # Kayıp değerlerinin geçmişi
+        
+        # Ölüm ve performans istatistikleri
+        self.wall_deaths = 0  # Duvara çarpma sayısı
+        self.self_deaths = 0  # Kendine çarpma sayısı
+        self.total_apples = 0  # Toplanan toplam elma sayısı
+        self.longest_snake = 0  # En uzun yılan uzunluğu
         
     def update(self, score, epsilon, loss):
-        self.scores.append(score)
-        self.max_score = max(self.max_score, score)
-        self.total_games += 1
-        self.epsilon_history.append(epsilon)
+        """Eğitim metriklerini günceller
+        
+        Args:
+            score (int): Mevcut oyunun skoru
+            epsilon (float): Güncel epsilon değeri
+            loss (float): Güncel kayıp değeri (None olabilir)
+            
+        Returns:
+            float: Güncel ortalama skor
+        """
+        # Temel metrikleri güncelle
+        self.scores.append(score)  # Yeni skoru ekle
+        self.max_score = max(self.max_score, score)  # Rekor güncelleme
+        self.total_games += 1  # Oyun sayısını artır
+        self.epsilon_history.append(epsilon)  # Epsilon geçmişini güncelle
+        
+        # Kayıp değeri varsa kaydet
         if loss is not None:
             self.loss_history.append(loss)
         
+        # Ortalama skoru hesapla ve kaydet
         mean_score = np.mean(list(self.scores))
         self.mean_scores.append(mean_score)
         
         return mean_score
 
 def train():
-    n_games = 1000
-    batch_size = 32
-    record = 0
-    ai = SnakeAI()
-    game = SnakeGame()
-    logger = TrainLogger()
+    """Yılanın eğitim sürecini yöneten ana fonksiyon
     
-    # Eğitim klasörünü oluştur
+    Bu fonksiyon:
+    1. Eğitim parametrelerini ayarlar
+    2. Oyun ve AI modelini başlatır
+    3. Eğitim döngüsünü yönetir
+    4. Modeli belirli aralıklarla kaydeder
+    5. İstatistikleri tutar ve gösterir
+    """
+    # Eğitim parametreleri
+    n_games = 1000  # Toplam eğitim oyunu sayısı
+    batch_size = 32  # Mini-batch boyutu
+    record = 0  # Rekor skor
+    
+    # Gerekli nesneleri oluştur
+    ai = SnakeAI()  # Yapay zeka modeli
+    game = SnakeGame()  # Oyun motoru
+    logger = TrainLogger()  # Eğitim loglayıcı
+    
+    # Model kayıt klasörünü oluştur
     if not os.path.exists('models'):
         os.makedirs('models')
 
@@ -166,56 +205,88 @@ def train():
                 print(f'Model kaydedildi: Checkpoint {i+1}')
 
 def play_step(game, action):
+    """Oyunda bir adım ilerlemeyi sağlayan fonksiyon
+    
+    Bu fonksiyon:
+    1. AI'nin seçtiği aksiyonu yöne çevirir
+    2. Yılanı hareket ettirir
+    3. Ödül hesaplaması yapar
+    
+    Args:
+        game (SnakeGame): Oyun nesnesi
+        action (int): AI'nin seçtiği aksiyon (0: düz, 1: sağ, 2: sol)
+        
+    Returns:
+        tuple: (ödül, oyun_bitti_mi, skor, ölüm_nedeni)
+    """
     # Ödül başlangıcı
     reward = 0
     
-    # Yönü güncelle
-    clock_wise = [Direction.RIGHT, Direction.DOWN, Direction.LEFT, Direction.UP]
-    idx = clock_wise.index(game.direction)
+    # Aksiyonu yöne çevir
+    clock_wise = [Direction.RIGHT, Direction.DOWN, Direction.LEFT, Direction.UP]  # Saat yönünde yönler
+    idx = clock_wise.index(game.direction)  # Mevcut yönün indeksi
     
-    if action == 0:  # Düz
+    # Yeni yönü belirle
+    if action == 0:  # Düz git
         new_dir = clock_wise[idx]
     elif action == 1:  # Sağa dön
         new_dir = clock_wise[(idx + 1) % 4]
     else:  # Sola dön
         new_dir = clock_wise[(idx - 1) % 4]
     
+    # Yeni yönü uygula
     game.direction = new_dir
     
-    # Skoru kaydet
-    old_score = game.score
-    old_distance = ((game.snake[0][0] - game.apple[0])**2 + (game.snake[0][1] - game.apple[1])**2)**0.5
-    old_head = game.snake[0]
+    # Hareket öncesi durumu kaydet
+    old_score = game.score  # Mevcut skor
+    old_distance = ((game.snake[0][0] - game.apple[0])**2 + 
+                   (game.snake[0][1] - game.apple[1])**2)**0.5  # Elmaya olan mesafe
+    old_head = game.snake[0]  # Yılanın başı
     
-    # Hareketi uygula
+    # Yılanı hareket ettir
     death_cause = game.move_snake()
     
-    # Yeni mesafeyi hesapla
+    # Hareket sonrası durumu değerlendir
     if not game.game_over:
+        # Yeni baş pozisyonu
         head = game.snake[0]
-        new_distance = ((head[0] - game.apple[0])**2 + (head[1] - game.apple[1])**2)**0.5
         
-        # Her adım için küçük negatif ödül (elmaya doğru hareket etmeye teşvik)
+        # Yeni elmaya olan mesafe
+        new_distance = ((head[0] - game.apple[0])**2 + 
+                       (head[1] - game.apple[1])**2)**0.5
+        
+        # Her adım için küçük negatif ödül
+        # Bu, yılanın gereksiz dönüşler yapmak yerine
+        # elmaya doğru hareket etmesini teşvik eder
         reward = -0.1
         
         # Elmaya yaklaşma/uzaklaşma kontrolü
+        # Elmaya yaklaşma durumunu kontrol et
         if new_distance < old_distance:
-            reward = 0  # Elmaya yaklaşıyorsa ceza verme
+            reward = 0  # Elmaya yaklaşıyorsa ceza verme (nötr durum)
         
-        # Döngüye girmeyi engelleme
+        # Yerinde sayma kontrolü
+        # Yılanın aynı noktada kalmasını engellemek için
+        # bu durumu cezalandırıyoruz
         if (old_head[0], old_head[1]) == (head[0], head[1]):
             reward = -1  # Aynı yerde kalma cezası
     
-    # Ödülü hesapla
+    # Ölüm durumu kontrolü
     if game.game_over:
-        reward = -10  # Ölüm cezası
+        reward = -10  # Ölüm durumunda büyük ceza
         return reward, True, game.score, death_cause
     
-    # Elma yeme ödülü
+    # Elma yeme kontrolü
     if game.score > old_score:
-        reward = 20  # Elma yeme ödülü
+        reward = 20  # Elma yeme durumunda büyük ödül
     
+    # Durumun sonuçlarını döndür:
+    # - reward: Hesaplanan ödül/ceza değeri
+    # - game.game_over: Oyun bitti mi?
+    # - game.score: Güncel skor
+    # - death_cause: Eğer öldüyse ölüm nedeni
     return reward, game.game_over, game.score, death_cause
 
 if __name__ == '__main__':
+    # Program doğrudan çalıştırıldığında eğitimi başlat
     train() 
