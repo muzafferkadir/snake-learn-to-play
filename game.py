@@ -54,16 +54,17 @@ class SnakeGame:
     def __init__(self):
         pygame.init()
         self.show_ui = True  # UI gösterme kontrolü
+        self.is_training = False  # Eğitim modu kontrolü
         # Eğitim paneli için sağda ekstra alan
         self.info_panel_width = 300
-        self.screen = pygame.display.set_mode((SCREEN_WIDTH + self.info_panel_width, SCREEN_HEIGHT))
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH + (self.info_panel_width if self.is_training else 0), SCREEN_HEIGHT))
         pygame.display.set_caption('Snake Game with AI')
         self.clock = pygame.time.Clock()
         self.base_speed = INITIAL_SPEED  # Temel hız
         self.speed = INITIAL_SPEED  # Oyun hızı
         self.training_speed = INITIAL_SPEED  # Eğitim hızı
         self.speed_multiplier = 1
-        self.is_training = False  # Eğitim modu kontrolü
+        self.last_direction = Direction.RIGHT  # Son yön bilgisini tutmak için
         
         # Tekrar oyna butonu
         button_width = 200
@@ -123,8 +124,12 @@ class SnakeGame:
         self.is_training = is_training
         if is_training:
             self.training_speed = self.base_speed * self.speed_multiplier
+            # Training modunda sağ panel ekle
+            self.screen = pygame.display.set_mode((SCREEN_WIDTH + self.info_panel_width, SCREEN_HEIGHT))
         else:
             self.speed = self.base_speed
+            # Normal modda sağ panel olmadan
+            self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 
     def update_speed(self, multiplier):
         old_multiplier = self.speed_multiplier
@@ -141,13 +146,14 @@ class SnakeGame:
                 if event.key == pygame.K_ESCAPE:
                     return False
                 if not self.game_over:
-                    if event.key == pygame.K_UP and self.direction != Direction.DOWN:
+                    # Yılanın anlık yönünü kontrol et ve son yönünü kullan
+                    if event.key == pygame.K_UP and self.last_direction != Direction.DOWN:
                         self.direction = Direction.UP
-                    if event.key == pygame.K_DOWN and self.direction != Direction.UP:
+                    if event.key == pygame.K_DOWN and self.last_direction != Direction.UP:
                         self.direction = Direction.DOWN
-                    if event.key == pygame.K_LEFT and self.direction != Direction.RIGHT:
+                    if event.key == pygame.K_LEFT and self.last_direction != Direction.RIGHT:
                         self.direction = Direction.LEFT
-                    if event.key == pygame.K_RIGHT and self.direction != Direction.LEFT:
+                    if event.key == pygame.K_RIGHT and self.last_direction != Direction.LEFT:
                         self.direction = Direction.RIGHT
             
             # Oyun bitti ekranında buton kontrolü
@@ -168,6 +174,9 @@ class SnakeGame:
             return None
 
         head = self.snake[0]
+        # Yılanın son yönünü kaydet
+        self.last_direction = self.direction
+        
         if self.direction == Direction.UP:
             new_head = (head[0], head[1] - 1)
         elif self.direction == Direction.DOWN:
@@ -223,10 +232,11 @@ class SnakeGame:
         score_rect = score_text.get_rect(midleft=(20, HEADER_HEIGHT//2))
         self.screen.blit(score_text, score_rect)
         
-        # Hız
-        speed_text = font.render(f'Hız: {self.speed}', True, WHITE)
-        speed_rect = speed_text.get_rect(midright=(SCREEN_WIDTH - 20, HEADER_HEIGHT//2))
-        self.screen.blit(speed_text, speed_rect)
+        # Hız (sadece training modunda değilse göster)
+        if not self.is_training:
+            speed_text = font.render(f'Hız: {self.speed}', True, WHITE)
+            speed_rect = speed_text.get_rect(midright=(SCREEN_WIDTH - 20, HEADER_HEIGHT//2))
+            self.screen.blit(speed_text, speed_rect)
         
         # Izgara çizimi
         for x in range(0, SCREEN_WIDTH, CELL_SIZE):
@@ -260,7 +270,7 @@ class SnakeGame:
             self.replay_button.draw(self.screen)
 
     def draw_training_info(self, game, score, record, mean_score, epsilon, steps, fps):
-        if not self.show_ui:
+        if not self.show_ui or not self.is_training:
             return
             
         # Sağ panel arkaplanı
@@ -345,6 +355,7 @@ class SnakeGame:
             self.move_snake()
             self.draw()
             self.clock.tick(self.speed)
+            pygame.display.flip()  # Ekranı güncelle
 
 if __name__ == "__main__":
     game = SnakeGame()
