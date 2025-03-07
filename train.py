@@ -73,14 +73,15 @@ def train():
     5. İstatistikleri tutar ve gösterir
     """
     # Eğitim parametreleri
-    n_games = 1000  # Toplam eğitim oyunu sayısı
-    batch_size = 32  # Mini-batch boyutu
+    n_games = 2000  # Toplam eğitim oyunu sayısı (artırıldı)
+    batch_size = 64  # Mini-batch boyutu (artırıldı)
+    target_update_freq = 50  # Hedef ağ güncelleme sıklığı (adım sayısı)
     record = 0  # Rekor skor
     
     # Gerekli nesneleri oluştur
     ai = SnakeAI()  # Yapay zeka modeli
     game = SnakeGame()  # Oyun motoru
-    logger = TrainLogger()  # Eğitim loglayıcı
+    logger = TrainLogger(log_size=200)  # Eğitim loglayıcı (log sayısı artırıldı)
     
     # Model kayıt klasörünü oluştur
     if not os.path.exists('models'):
@@ -91,6 +92,8 @@ def train():
     # Eğitim modunu aktifleştir
     game.set_training_mode(True)
     game.training_speed = INITIAL_SPEED * 8  # Başlangıç eğitim hızı 8x
+    
+    total_steps = 0  # Toplam adım sayısı
     
     for i in range(n_games):
         # Her 50 oyunda bir UI göster
@@ -146,9 +149,10 @@ def train():
             loss = ai.replay(batch_size)
             
             steps += 1
+            total_steps += 1
             
-            # Her 100 adımda bir target modeli güncelle
-            if steps % 100 == 0:
+            # Hedef ağı belirli aralıklarla güncelle
+            if total_steps % target_update_freq == 0:
                 ai.update_target_model()
             
             if show_ui:
@@ -255,36 +259,65 @@ def play_step(game, action):
         new_distance = ((head[0] - game.apple[0])**2 + 
                        (head[1] - game.apple[1])**2)**0.5
         
-        # Her adım için küçük negatif ödül
+        # Her adım için çok küçük negatif ödül
         # Bu, yılanın gereksiz dönüşler yapmak yerine
         # elmaya doğru hareket etmesini teşvik eder
-        reward = -0.1
+        reward = -0.05
         
         # Elmaya yaklaşma/uzaklaşma kontrolü
-        # Elmaya yaklaşma durumunu kontrol et
         if new_distance < old_distance:
-            reward = 0  # Elmaya yaklaşıyorsa ceza verme (nötr durum)
+            reward = 0.1  # Elmaya yaklaşıyorsa küçük ödül
+        elif new_distance > old_distance:
+            reward = -0.2  # Elmadan uzaklaşıyorsa daha büyük ceza
+            
+        # Yılanın etrafını kontrol et - çıkmaza girmemesi için
+        surrounding_danger = 0
+        directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]  # Aşağı, sağ, yukarı, sol
+        
+        # Yılanın etrafındaki engelleri say
+        for dx, dy in directions:
+            check_pos = (head[0] + dx, head[1] + dy)
+            # Duvar veya yılan kendisi
+            if (check_pos[0] < 0 or check_pos[0] >= GRID_SIZE or
+                check_pos[1] < 0 or check_pos[1] >= GRID_SIZE or
+                check_pos in game.snake[1:]):
+                surrounding_danger += 1
+        
+        # Çıkmaza girme cezası (3 veya daha fazla engelle çevrili)
+        if surrounding_danger >= 3:
+            reward -= 0.5
+            
+        # Duvara veya kuyruğa çok yaklaşma cezası
+        for dx, dy in directions:
+            check_pos = (head[0] + dx, head[1] + dy)
+            if check_pos in game.snake[1:]:
+                # Kuyruğa yaklaşma cezası (elma yönünde değilse)
+                apple_direction = (
+                    1 if game.apple[0] > head[0] else -1 if game.apple[0] < head[0] else 0,
+                    1 if game.apple[1] > head[1] else -1 if game.apple[1] < head[1] else 0
+                )
+                
+                # Eğer kuyruk elmaya giden yolda değilse
+                if apple_direction != (dx, dy):
+                    reward -= 0.3
         
         # Yerinde sayma kontrolü
-        # Yılanın aynı noktada kalmasını engellemek için
-        # bu durumu cezalandırıyoruz
         if (old_head[0], old_head[1]) == (head[0], head[1]):
             reward = -1  # Aynı yerde kalma cezası
     
     # Ölüm durumu kontrolü
     if game.game_over:
-        reward = -10  # Ölüm durumunda büyük ceza
+        if death_cause == "KUYRUK":
+            reward = -15  # Kuyruğa çarpma için daha büyük ceza
+        else:  # Duvar ölümü
+            reward = -10  # Normal ölüm cezası
         return reward, True, game.score, death_cause
     
     # Elma yeme kontrolü
     if game.score > old_score:
-        reward = 20  # Elma yeme durumunda büyük ödül
+        reward = 25  # Elma yeme durumunda büyük ödül
     
-    # Durumun sonuçlarını döndür:
-    # - reward: Hesaplanan ödül/ceza değeri
-    # - game.game_over: Oyun bitti mi?
-    # - game.score: Güncel skor
-    # - death_cause: Eğer öldüyse ölüm nedeni
+    # Durumun sonuçlarını döndür
     return reward, game.game_over, game.score, death_cause
 
 if __name__ == '__main__':

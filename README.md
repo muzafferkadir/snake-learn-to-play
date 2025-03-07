@@ -15,6 +15,31 @@ Bu proje, klasik yılan oyununun Python ile gerçekleştirilmiş ve yapay zeka i
    - Epsilon-greedy keşif stratejisi
    - Eğitim istatistikleri görüntüleme
    - Ayarlanabilir eğitim hızı (1x - 512x)
+   - Geliştirilmiş durum algılama (29 özellik)
+   - Çıkmaz durumları engelleme
+   - 4 katmanlı derin sinir ağı mimarisi
+
+## Yapay Zeka İyileştirmeleri
+
+1. **Genişletilmiş Durum Vektörü (21→29 özellik)**
+   - Çapraz yönlerde engel algılama
+   - Duvar mesafesi bilgisi
+   - Çıkmaz durum tespiti
+
+2. **İyileştirilmiş Ödül Fonksiyonu**
+   - Çıkmaz durumlar için özel ceza
+   - Elmaya yaklaşmayı daha iyi ödüllendirme
+   - Kendi kuyruğuna yaklaşmayı cezalandırma
+
+3. **Güçlendirilmiş Model Mimarisi**
+   - 4 katmanlı derin sinir ağı
+   - 512 boyutlu gizli katmanlar
+   - Daralan mimari yapı
+
+4. **Optimize Edilmiş Hiperparametreler**
+   - Daha büyük bellek kapasitesi (200.000)
+   - Daha yüksek indirim faktörü (0.995)
+   - Daha dengeli öğrenme oranı (0.0002)
 
 ## Kurulum
 
@@ -61,9 +86,17 @@ Yapay zekayı eğitmek için:
 python train.py
 ```
 
+### AI ile Oyunu Oynatma
+Eğitim sonrası kayıt edilen modeller ile (models klasörü içinde) oyunu başlatmak için:
+
+```bash
+python play_ai.py --model models/model_record_***.pth 
+```
+
 **Eğitim Parametreleri:**
-- `n_games`: Eğitilecek oyun sayısı (varsayılan: 1000)
-- `batch_size`: Her adımda eğitilecek örnek sayısı (varsayılan: 32)
+- `n_games`: Eğitilecek oyun sayısı (varsayılan: 2000)
+- `batch_size`: Her adımda eğitilecek örnek sayısı (varsayılan: 64)
+- `target_update_freq`: Hedef ağ güncelleme sıklığı (varsayılan: 50 adım)
 
 **Eğitim Ekranı:**
 - Sol tarafta oyun alanı
@@ -90,9 +123,11 @@ python train.py
 ├── game.py           # Oyun motoru ve arayüzü
 ├── ai_model.py       # Yapay zeka modeli (DQN)
 ├── train.py          # Eğitim döngüsü
+├── play_ai.py        # Eğitilmiş model ile oynatma
 ├── direction.py      # Yön enumları
 ├── constants.py      # Sabitler
 ├── requirements.txt  # Bağımlılıklar
+├── models/           # Eğitilmiş modeller
 └── README.md         # Dokümantasyon
 ```
 
@@ -109,4 +144,4 @@ pip freeze > requirements.txt
 - `.gitignore` dosyası sayesinde `venv` klasörü ve `__pycache__` git'e dahil edilmez
 - Her yeni geliştirme ortamında kurulum adımlarını tekrarlayın
 - Eğitim sırasında model ağırlıkları otomatik olarak kaydedilir
-- Daha iyi sonuçlar için eğitimi daha uzun süre çalıştırın (n_games > 1000)
+- Daha iyi sonuçlar için eğitimi daha uzun süre çalıştırın (n_games > 2000)

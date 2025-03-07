@@ -12,7 +12,7 @@ class DQN(nn.Module):
     """Deep Q-Network (DQN) sınıfı
     
     Bu sınıf, derin Q-öğrenme için kullanılan sinir ağı modelini tanımlar.
-    3 katmanlı bir yapıya sahiptir: giriş katmanı -> gizli katman -> çıkış katmanı
+    4 katmanlı bir yapıya sahiptir: giriş katmanı -> gizli katmanlar -> çıkış katmanı
     """
     def __init__(self, input_size, hidden_size, output_size):
         """DQN modelinin yapılandırılması
@@ -23,13 +23,15 @@ class DQN(nn.Module):
             output_size (int): Çıkış katmanı boyutu (aksiyon sayısı)
         """
         super(DQN, self).__init__()
-        # Sinir ağı mimarisi: Giriş -> ReLU -> Gizli -> ReLU -> Çıkış
+        # Geliştirilmiş sinir ağı mimarisi
         self.network = nn.Sequential(
-            nn.Linear(input_size, hidden_size),  # Giriş -> Gizli katman
+            nn.Linear(input_size, hidden_size),  # Giriş -> 1. Gizli katman
             nn.ReLU(),  # Aktivasyon fonksiyonu
-            nn.Linear(hidden_size, hidden_size),  # Gizli -> Gizli katman
+            nn.Linear(hidden_size, hidden_size),  # 1. Gizli -> 2. Gizli katman
             nn.ReLU(),  # Aktivasyon fonksiyonu
-            nn.Linear(hidden_size, output_size)  # Gizli -> Çıkış katmanı
+            nn.Linear(hidden_size, hidden_size // 2),  # 2. Gizli -> 3. Gizli katman (daha küçük)
+            nn.ReLU(),  # Aktivasyon fonksiyonu
+            nn.Linear(hidden_size // 2, output_size)  # 3. Gizli -> Çıkış katmanı
         )
 
     def forward(self, x):
@@ -49,25 +51,25 @@ class SnakeAI:
     Bu sınıf, yılanın davranışlarını kontrol eden yapay zeka ajanını temsil eder.
     DQN algoritması kullanarak yılanın optimal hareketleri öğrenmesini sağlar.
     """
-    def __init__(self, state_size=21, hidden_size=256, action_size=3):
+    def __init__(self, state_size=29, hidden_size=512, action_size=3):
         """SnakeAI sınıfının başlatılması
         
         Args:
-            state_size (int): Durum vektörünün boyutu (default: 21)
-            hidden_size (int): Gizli katman boyutu (default: 256)
+            state_size (int): Durum vektörünün boyutu (default: 29)
+            hidden_size (int): Gizli katman boyutu (default: 512)
             action_size (int): Aksiyon uzayı boyutu (default: 3)
         """
         # Temel parametreler
         self.state_size = state_size  # Durum vektörü boyutu
         self.action_size = action_size  # Aksiyon sayısı
-        self.memory = deque(maxlen=100000)  # Deneyim hafızası (son 100,000 deneyim)
+        self.memory = deque(maxlen=200000)  # Deneyim hafızası (son 200,000 deneyim)
         
         # Öğrenme parametreleri
-        self.gamma = 0.98  # İndirim faktörü (gelecek ödüllerin ağırlığı)
+        self.gamma = 0.995  # İndirim faktörü (gelecek ödüllerin ağırlığı)
         self.epsilon = 1.0  # Başlangıç keşif oranı
-        self.epsilon_min = 0.02  # Minimum keşif oranı
-        self.epsilon_decay = 0.998  # Keşif oranı azalma katsayısı
-        self.learning_rate = 0.0005  # Öğrenme oranı
+        self.epsilon_min = 0.01  # Minimum keşif oranı
+        self.epsilon_decay = 0.9995  # Keşif oranı azalma katsayısı
+        self.learning_rate = 0.0002  # Öğrenme oranı
         
         # Cihaz seçimi (GPU varsa GPU, yoksa CPU)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -89,13 +91,13 @@ class SnakeAI:
         """Oyunun mevcut durumunu bir durum vektörüne dönüştürür
         
         Bu fonksiyon, oyunun mevcut durumunu AI'nın anlayabileceği bir formata çevirir.
-        Toplam 21 özellikten oluşan bir durum vektörü oluşturur.
+        Toplam 29 özellikten oluşan bir durum vektörü oluşturur.
         
         Args:
             game: Oyun nesnesi
             
         Returns:
-            numpy.array: 21 elemanlı durum vektörü
+            numpy.array: 29 elemanlı durum vektörü
         """
         # Yılanın başı ve etrafındaki noktalar
         head = game.snake[0]  # Yılanın başı
@@ -103,6 +105,12 @@ class SnakeAI:
         point_r = (head[0] + 1, head[1])  # Sağ nokta
         point_u = (head[0], head[1] - 1)  # Üst nokta
         point_d = (head[0], head[1] + 1)  # Alt nokta
+        
+        # Çapraz noktalar (daha geniş algı alanı için)
+        point_ul = (head[0] - 1, head[1] - 1)  # Sol üst çapraz
+        point_ur = (head[0] + 1, head[1] - 1)  # Sağ üst çapraz
+        point_dl = (head[0] - 1, head[1] + 1)  # Sol alt çapraz
+        point_dr = (head[0] + 1, head[1] + 1)  # Sağ alt çapraz
 
         # Yılanın mevcut yönü
         dir_l = game.direction == Direction.LEFT
@@ -110,7 +118,7 @@ class SnakeAI:
         dir_u = game.direction == Direction.UP
         dir_d = game.direction == Direction.DOWN
 
-        # Durum vektörü (toplam 21 özellik):
+        # Durum vektörü (toplam 29 özellik):
         state = [
             # 1-3: Tehlike algılama (3 özellik)
             # Önde tehlike var mı?
@@ -147,19 +155,31 @@ class SnakeAI:
             abs(game.apple[0] - head[0]) / GRID_SIZE,  # X ekseni mesafesi (normalize edilmiş)
             abs(game.apple[1] - head[1]) / GRID_SIZE,  # Y ekseni mesafesi (normalize edilmiş)
 
-            # 14: Yılanın mevcut yönü (1 özellik)
+            # 14-17: Duvar yakınlık algısı (4 özellik) - Yeni!
+            head[0] / GRID_SIZE,  # Normalize edilmiş X pozisyonu (sol duvar mesafesi)
+            (GRID_SIZE - 1 - head[0]) / GRID_SIZE,  # Normalize edilmiş sağ duvar mesafesi
+            head[1] / GRID_SIZE,  # Normalize edilmiş Y pozisyonu (üst duvar mesafesi)
+            (GRID_SIZE - 1 - head[1]) / GRID_SIZE,  # Normalize edilmiş alt duvar mesafesi
+
+            # 18: Yılanın mevcut yönü (1 özellik)
             int(game.direction.value) / 4.0,  # Normalize edilmiş yön değeri
 
-            # 15-20: Yılan vücut bilgileri (6 özellik)
+            # 19: Yılan uzunluğu (1 özellik)
             len(game.snake) / GRID_SIZE,  # Normalize edilmiş yılan uzunluğu
             
-            # Vücut parçaları var mı? (4 yön)
+            # 20-23: Yakın vücut parçaları (4 özellik)
             int(point_l in game.snake[1:]),  # Solda vücut var mı?
             int(point_r in game.snake[1:]),  # Sağda vücut var mı?
             int(point_u in game.snake[1:]),  # Yukarıda vücut var mı?
             int(point_d in game.snake[1:]),  # Aşağıda vücut var mı?
+            
+            # 24-27: Çapraz vücut parçaları (4 özellik) - Yeni!
+            int(point_ul in game.snake[1:]),  # Sol üst çaprazda vücut var mı?
+            int(point_ur in game.snake[1:]),  # Sağ üst çaprazda vücut var mı?
+            int(point_dl in game.snake[1:]),  # Sol alt çaprazda vücut var mı?
+            int(point_dr in game.snake[1:]),  # Sağ alt çaprazda vücut var mı?
 
-            # 21: Kuyruk yönü (2 özellik)
+            # 28-29: Kuyruk yönü (2 özellik)
             int(game.snake[-1][0] < head[0]) - int(game.snake[-1][0] > head[0]),  # X ekseni kuyruk yönü
             int(game.snake[-1][1] < head[1]) - int(game.snake[-1][1] > head[1])   # Y ekseni kuyruk yönü
         ]

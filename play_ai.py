@@ -6,7 +6,8 @@ import argparse
 
 def play_ai(model_path):
     game = SnakeGame()
-    ai = SnakeAI()
+    # Güncellenmiş durum vektörü boyutu (29) ve hidden size (512) ile AI oluştur
+    ai = SnakeAI(state_size=29, hidden_size=512)
     
     # Modeli yükle
     try:
@@ -39,7 +40,7 @@ def play_ai(model_path):
         game.direction = new_dir
         
         # Hareketi uygula
-        game.move_snake()
+        death_cause = game.move_snake()
         
         # Oyunu çiz
         game.draw()
@@ -60,7 +61,7 @@ def play_ai(model_path):
         
         # Oyun bitti mi?
         if game.game_over:
-            print(f"Oyun bitti! Skor: {game.score}")
+            print(f"Oyun bitti! Skor: {game.score}, Ölüm nedeni: {death_cause}")
             game.reset_game()
 
 if __name__ == "__main__":
